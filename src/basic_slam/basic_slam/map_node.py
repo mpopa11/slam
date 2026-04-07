@@ -28,11 +28,11 @@ def bresenham_line(x0, y0, x1, y1):
     error = dx - dy
 
     while True:
-
+        path.append((x0, y0))
         if x0 == x1 and y0 == y1:
             break
         
-        path.append((x0, y0))
+
         
         e2 = 2 * error
 
@@ -81,7 +81,7 @@ class MapNode(Node):
         self.map_length = 10
         self.map_origin_x = self.map_length * -1 / 2
         self.map_origin_y = self.map_length * -1 / 2
-        self.resolution = 0.05
+        self.resolution = 0.025
         self.width = int(self.map_length / self.resolution)
         self.height = int(self.map_length / self.resolution)
         self.map_grid = np.full((self.height, self.width), 0, dtype=np.float32)
@@ -126,7 +126,9 @@ class MapNode(Node):
         
                 coordinates.append((x, y))
 
-        
+        self.get_logger().info(str(coordinates))
+        self.get_logger().info(str(list([self.x, self.y, self.yaw])))
+
         coordinates = np.array(coordinates)
         robot_grid_pose = [
             int((self.x - self.map_origin_x) // self.resolution),
@@ -139,10 +141,10 @@ class MapNode(Node):
 
         for x, y in grid:
             path = bresenham_line(robot_grid_pose[0], robot_grid_pose[1], x, y)
-            self.map_grid[path[:, 1], path[:, 0]] -= 0.1
+            self.map_grid[path[:-1, 1], path[:-1, 0]] -= 0.1
         
         self.map_grid[grid[:, 1], grid[:, 0]] += 0.5
-        self.map_grid = np.clip(self.map_grid, -3, 6,)
+        self.map_grid = np.clip(self.map_grid, -3, 6)
 
         probability = 1 - 1 / (1 + np.exp(self.map_grid))
         msg_grid = np.full((self.height, self.width), -1, dtype=np.int8)

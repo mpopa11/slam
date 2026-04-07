@@ -43,8 +43,8 @@ class ImuNode(Node):
 
 
     def callback_imu(self, msg):
-        # rot_z = math.atan2(2 * (msg.orientation.w * msg.orientation.z +  msg.orientation.x * msg.orientation.y),
-        #                     1 - 2 * (msg.orientation.y ** 2 + msg.orientation.z ** 2 ))
+        rot_z = math.atan2(2 * (msg.orientation.w * msg.orientation.z +  msg.orientation.x * msg.orientation.y),
+                            1 - 2 * (msg.orientation.y ** 2 + msg.orientation.z ** 2 ))
         time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
 
         if self.prev_time == 0:
@@ -64,7 +64,7 @@ class ImuNode(Node):
             pos_yaw = PosYaw()
             pos_yaw.x = pos_x
             pos_yaw.y = pos_y
-            pos_yaw.yaw = self.yaw
+            pos_yaw.yaw = rot_z
             
             self.publisher.publish(pos_yaw)
 
