@@ -2,10 +2,13 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy
+from tf2_ros import TransformBroadcaster
 
 from messages.msg import PosYaw
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import TransformStamped
+
 import numpy as np
 import math
 import small_gicp
@@ -79,6 +82,8 @@ class MapNode(Node):
             10
         )
 
+        self.transform_broadcaster = TransformBroadcaster(self)
+
         qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
 
         self.map_publisher = self.create_publisher(
@@ -111,7 +116,7 @@ class MapNode(Node):
 
         
         self.occupancy_grid_msg = OccupancyGrid()
-        self.occupancy_grid_msg.header.frame_id = 'odom'
+        self.occupancy_grid_msg.header.frame_id = 'map'
         self.occupancy_grid_msg.info.map_load_time = self.get_clock().now().to_msg()
         self.occupancy_grid_msg.info.resolution = self.resolution
         self.occupancy_grid_msg.info.height = self.height
@@ -123,6 +128,13 @@ class MapNode(Node):
         self.occupancy_grid_msg.info.origin.orientation.x = 0.0
         self.occupancy_grid_msg.info.origin.orientation.y = 0.0
         self.occupancy_grid_msg.info.origin.orientation.z = 0.0
+
+
+        self.map_odom_tf_msg = TransformStamped()
+        self.map_odom_tf_msg.header.frame_id = "/map"
+        self.map_odom_tf_msg.child_frame_id = "/odom"
+
+        self.tf_timer = self.create_timer(0.1, self.publish_map_odom_tf)
 
     def pose_callback(self, msg):
         self.odom_x = msg.x
@@ -193,8 +205,11 @@ class MapNode(Node):
                 self.y_icp = pred_y
                 self.yaw_icp = pred_yaw
             # self.get_logger().info(str(list(zip(x,y))))
-            self.get_logger().info(f'{self.odom_x}\t{self.odom_y}\t{self.odom_yaw}')
-            self.get_logger().info(f'{self.x_icp}\t{self.y_icp}\t{self.yaw_icp}')
+            # self.get_logger().info(f'{self.odom_x}\t{self.odom_y}\t{self.odom_yaw}')
+            # self.get_logger().info(f'{self.x_icp}\t{self.y_icp}\t{self.yaw_icp}')
+            self.get_logger().info(
+            f'odom {self.odom_x:+.3f} {self.odom_y:+.3f} {self.odom_yaw:+.3f} | '
+            f'icp  {self.x_icp:+.3f} {self.y_icp:+.3f} {self.yaw_icp:+.3f}')
 
         self.last_odom_x = self.odom_x
         self.last_odom_y = self.odom_y
@@ -218,9 +233,9 @@ class MapNode(Node):
         for x, y in grid:
             path = bresenham_line(robot_grid_pose[0], robot_grid_pose[1], x, y)
             if len(path) > 0:
-                self.map_grid[path[:, 1], path[:, 0]] -= 0.1
+                self.map_grid[path[:, 1], path[:, 0]] -= 0.05
         
-        self.map_grid[grid[:, 1], grid[:, 0]] += 0.5
+        self.map_grid[grid[:, 1], grid[:, 0]] += 0.2
         self.map_grid = np.clip(self.map_grid, -3, 6,)
 
         probability = 1 - 1 / (1 + np.exp(self.map_grid))
@@ -231,8 +246,10 @@ class MapNode(Node):
 
         self.occupancy_grid_msg.data = msg_grid.flatten().tolist()
         self.occupancy_grid_msg.header.stamp = self.get_clock().now().to_msg()
+        self.map_odom_tf_msg.header.stamp = self.occupancy_grid_msg.header.stamp
 
         self.map_publisher.publish(self.occupancy_grid_msg)
+        self.publish_map_odom_tf()
 
         self.pose_msg_recv = False
 
@@ -261,13 +278,40 @@ class MapNode(Node):
         x = self.resolution * (points[:, 1] + 0.5) + self.map_origin_x
         y = self.resolution * (points[:, 0] + 0.5) + self.map_origin_y
 
-        return np.column_stack([x, y, np.zeros(len(x))])   
+        return np.column_stack([x, y, np.zeros(len(x))])
+    
+    def publish_map_odom_tf(self):
+
+        if self.yaw_icp is None:
+            return
+
+        map_odom_tf = htm(self.x_icp, self.y_icp, self.yaw_icp) @ np.linalg.inv(htm(self.odom_x, self.odom_y, self.odom_yaw))
+
+        x = map_odom_tf[1, 3]
+        y = map_odom_tf[2, 3]
+        yaw =  math.atan2(math.sin(math.atan2(map_odom_tf[1, 0], map_odom_tf[0, 0])),
+                                        math.cos(math.atan2(map_odom_tf[1, 0], map_odom_tf[0, 0])))
+        
+        qz = math.sin(yaw / 2)
+        qw = math.cos(yaw / 2)
+
+        # self.map_odom_tf_msg.header.stamp = self.get_clock().now().to_msg()
+        self.map_odom_tf_msg.transform.translation.x = float(x)
+        self.map_odom_tf_msg.transform.translation.y = float(y)
+        self.map_odom_tf_msg.transform.translation.z = 0.0
+
+        self.map_odom_tf_msg._transform.rotation.x = 0.0
+        self.map_odom_tf_msg._transform.rotation.y = 0.0
+        self.map_odom_tf_msg._transform.rotation.z = float(qz)
+        self.map_odom_tf_msg._transform.rotation.w = float(qw)
+
+        self.transform_broadcaster.sendTransform(self.map_odom_tf_msg)
     
 def main():
     try:
         with rclpy.init():
             map_node = MapNode()
-
+            
             rclpy.spin(map_node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass

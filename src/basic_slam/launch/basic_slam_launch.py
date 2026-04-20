@@ -9,13 +9,15 @@ def generate_launch_description():
     imu_odom_node = Node(
         package='basic_slam',
         executable='imu_odom',
-        name='imu_odom'
+        name='imu_odom',
+        parameters=[{'use_sim_time': True}]
     )
 
     map_node = Node(
         package='basic_slam',
         executable='map_node',
-        name='map_node'
+        name='map_node',
+        parameters=[{'use_sim_time': True}]
     )
     
     rviz_node = Node(
@@ -23,7 +25,8 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz2',
         arguments=['-d', rviz_config],
-        output='screen'
+        output='screen',
+        parameters=[{'use_sim_time': True}]
     )
 
     return LaunchDescription([
