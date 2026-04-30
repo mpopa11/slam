@@ -106,7 +106,7 @@ class MapNode(Node):
         self.y_icp = 0.0
         self.yaw_icp = None
         
-        self.map_length = 10
+        self.map_length = 20
         self.map_origin_x = self.map_length * -1 / 2
         self.map_origin_y = self.map_length * -1 / 2
         self.resolution = 0.05
@@ -131,8 +131,8 @@ class MapNode(Node):
 
 
         self.map_odom_tf_msg = TransformStamped()
-        self.map_odom_tf_msg.header.frame_id = "/map"
-        self.map_odom_tf_msg.child_frame_id = "/odom"
+        self.map_odom_tf_msg.header.frame_id = "map"
+        self.map_odom_tf_msg.child_frame_id = "odom"
 
         self.tf_timer = self.create_timer(0.1, self.publish_map_odom_tf)
 
@@ -167,8 +167,23 @@ class MapNode(Node):
             self.last_odom_y = self.odom_y
             self.last_odom_yaw = self.odom_yaw
 
+            # self.pose_msg_recv = False
+            # return
+
         pred_x, pred_y, pred_yaw = self.predict_pose()
         
+        if len(local_coordinates) == 0:
+            self.x_icp = pred_x
+            self.y_icp = pred_y
+            self.yaw_icp = pred_yaw
+
+            self.last_odom_x = self.odom_x
+            self.last_odom_y = self.odom_y
+            self.last_odom_yaw = self.odom_yaw
+
+            self.pose_msg_recv = False
+            return
+
         map_point_cloud = self.extract_map()
 
         if map_point_cloud is None:
@@ -187,7 +202,7 @@ class MapNode(Node):
             result = small_gicp.align(target, source, target_kd_tree,
                                     registration_type='GICP',
                                     max_correspondence_distance=0.3, 
-                                    max_iterations=30)
+                                    max_iterations=25)
 
 
             if (result.converged 
@@ -209,7 +224,8 @@ class MapNode(Node):
             # self.get_logger().info(f'{self.x_icp}\t{self.y_icp}\t{self.yaw_icp}')
             self.get_logger().info(
             f'odom {self.odom_x:+.3f} {self.odom_y:+.3f} {self.odom_yaw:+.3f} | '
-            f'icp  {self.x_icp:+.3f} {self.y_icp:+.3f} {self.yaw_icp:+.3f}')
+            f'icp  {self.x_icp:+.3f} {self.y_icp:+.3f} {self.yaw_icp:+.3f} | '
+            f'pred {pred_x:+.3f} {pred_y:+.3f} {pred_yaw:+.3f}')
 
         self.last_odom_x = self.odom_x
         self.last_odom_y = self.odom_y
@@ -229,7 +245,7 @@ class MapNode(Node):
 
         grid[:, 1] = np.clip(grid[:, 1], 0, self.height - 1)
         grid[:, 0] = np.clip(grid[:, 0], 0, self.width - 1)
-
+        
         for x, y in grid:
             path = bresenham_line(robot_grid_pose[0], robot_grid_pose[1], x, y)
             if len(path) > 0:
@@ -270,7 +286,7 @@ class MapNode(Node):
         return x, y, yaw
 
     def extract_map(self):
-        points = np.argwhere(self.map_grid > 3.0)
+        points = np.argwhere(self.map_grid > 1.0)
 
         if len(points) == 0:
             return None
@@ -287,8 +303,7 @@ class MapNode(Node):
 
         map_odom_tf = htm(self.x_icp, self.y_icp, self.yaw_icp) @ np.linalg.inv(htm(self.odom_x, self.odom_y, self.odom_yaw))
 
-        x = map_odom_tf[1, 3]
-        y = map_odom_tf[2, 3]
+        x, y = map_odom_tf[:2, 3]
         yaw =  math.atan2(math.sin(math.atan2(map_odom_tf[1, 0], map_odom_tf[0, 0])),
                                         math.cos(math.atan2(map_odom_tf[1, 0], map_odom_tf[0, 0])))
         
@@ -300,10 +315,10 @@ class MapNode(Node):
         self.map_odom_tf_msg.transform.translation.y = float(y)
         self.map_odom_tf_msg.transform.translation.z = 0.0
 
-        self.map_odom_tf_msg._transform.rotation.x = 0.0
-        self.map_odom_tf_msg._transform.rotation.y = 0.0
-        self.map_odom_tf_msg._transform.rotation.z = float(qz)
-        self.map_odom_tf_msg._transform.rotation.w = float(qw)
+        self.map_odom_tf_msg.transform.rotation.x = 0.0
+        self.map_odom_tf_msg.transform.rotation.y = 0.0
+        self.map_odom_tf_msg.transform.rotation.z = float(qz)
+        self.map_odom_tf_msg.transform.rotation.w = float(qw)
 
         self.transform_broadcaster.sendTransform(self.map_odom_tf_msg)
     
