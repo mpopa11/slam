@@ -324,10 +324,13 @@ class MapNode(Node):
     
 def main():
     try:
-        with rclpy.init():
-            map_node = MapNode()
-            
-            rclpy.spin(map_node)
+        rclpy.init(args=args)
+        map_node = MapNode()
+        
+        rclpy.spin(map_node)
+        map_node.destroy_node()
+
+        rclpy.shutdown()
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
 
