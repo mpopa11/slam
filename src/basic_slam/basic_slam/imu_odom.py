@@ -72,12 +72,15 @@ class ImuNode(Node):
         self.odom_msg_recv = True
         self.odom_msg = msg
 
-def main():
+def main(args=None):
     try:
-        with rclpy.init():
-            imu_node = ImuNode()
+        rclpy.init(args=args)
+        imu_node = ImuNode()
 
-            rclpy.spin(imu_node)
+        rclpy.spin(imu_node)
+
+        imu_node.destroy_node()
+        rclpy.shutdown()
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
 
