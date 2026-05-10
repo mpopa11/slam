@@ -322,7 +322,7 @@ class MapNode(Node):
 
         self.transform_broadcaster.sendTransform(self.map_odom_tf_msg)
     
-def main():
+def main(args=None):
     try:
         rclpy.init(args=args)
         map_node = MapNode()
