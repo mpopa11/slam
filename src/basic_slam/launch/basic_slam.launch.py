@@ -29,8 +29,33 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}]
     )
 
+    # Static transforms to view the tf tree in rviz from rosbag
+    base_footprint_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0', '-0.010', '0', '0', '0', 'base_link', 'base_footprint'],
+        parameters=[{'use_sim_time': True}]
+    )
+
+    imu_link_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['-0.032', '0', '0.068', '0', '0', '0', 'base_link', 'imu_link'],
+        parameters=[{'use_sim_time': True}]
+    )
+
+    base_scan_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['-0.032', '0', '0.172', '0', '0', '0', 'base_link', 'base_scan'],
+        parameters=[{'use_sim_time': True}]
+    )
+
     return LaunchDescription([
+        base_footprint_tf,
+        imu_link_tf,
+        base_scan_tf,
         imu_odom_node,
         map_node,
-        rviz_node
+        rviz_node,
     ])
