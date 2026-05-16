@@ -12,6 +12,7 @@ from geometry_msgs.msg import TransformStamped
 import numpy as np
 import math
 import small_gicp
+import cv2
 
 def bresenham_line(x0, y0, x1, y1):
     path = []
@@ -134,7 +135,7 @@ class MapNode(Node):
         self.map_odom_tf_msg.header.frame_id = "map"
         self.map_odom_tf_msg.child_frame_id = "odom"
 
-        self.tf_timer = self.create_timer(0.1, self.publish_map_odom_tf)
+        # self.tf_timer = self.create_timer(0.1, self.publish_map_odom_tf)
 
     def pose_callback(self, msg):
         self.odom_x = msg.x
@@ -170,6 +171,12 @@ class MapNode(Node):
             # self.pose_msg_recv = False
             # return
 
+        # d_dist = math.hypot(self.odom_x - self.last_odom_x, self.odom_y - self.last_odom_y)
+        # d_angle = abs(get_normalized_angle(self.odom_yaw - self.last_odom_yaw))
+        # if d_dist < 0.05 and d_angle < 0.05:
+        #     self.pose_msg_recv = False
+        #     return
+
         pred_x, pred_y, pred_yaw = self.predict_pose()
         
         if len(local_coordinates) == 0:
@@ -201,13 +208,13 @@ class MapNode(Node):
             (source, _) = small_gicp.preprocess_points(world_coordinates, downsampling_resolution=0.025)
             result = small_gicp.align(target, source, target_kd_tree,
                                     registration_type='GICP',
-                                    max_correspondence_distance=0.3, 
-                                    max_iterations=25)
+                                    max_correspondence_distance=0.2, 
+                                    max_iterations=15)
 
 
             if (result.converged 
-                and math.hypot(result.T_target_source[0, 3], result.T_target_source[1, 3]) < 0.3 
-                and abs(math.atan2(result.T_target_source[1, 0], result.T_target_source[0, 0])) < 0.26):
+                and math.hypot(result.T_target_source[0, 3], result.T_target_source[1, 3]) < 0.2 
+                and abs(math.atan2(result.T_target_source[1, 0], result.T_target_source[0, 0])) < 0.09):
                 
                 true_transform = result.T_target_source @ htm(pred_x, pred_y, pred_yaw)
                 self.x_icp, self.y_icp = true_transform[:2, 3]
@@ -236,6 +243,9 @@ class MapNode(Node):
             int((self.y_icp - self.map_origin_y) // self.resolution)
         ]
 
+        robot_grid_pose[0] = np.clip(robot_grid_pose[0], 0, self.width - 1)
+        robot_grid_pose[1] = np.clip(robot_grid_pose[1], 0, self.height - 1)
+
         x = self.x_icp + local_coordinates[:, 0] * math.cos(self.yaw_icp) - local_coordinates[:, 1] * math.sin(self.yaw_icp)
         y = self.y_icp + local_coordinates[:, 0] * math.sin(self.yaw_icp) + local_coordinates[:, 1] * math.cos(self.yaw_icp)
 
@@ -246,11 +256,13 @@ class MapNode(Node):
         grid[:, 1] = np.clip(grid[:, 1], 0, self.height - 1)
         grid[:, 0] = np.clip(grid[:, 0], 0, self.width - 1)
         
-        for x, y in grid:
-            path = bresenham_line(robot_grid_pose[0], robot_grid_pose[1], x, y)
-            if len(path) > 0:
-                self.map_grid[path[:, 1], path[:, 0]] -= 0.05
-        
+        free_mask = np.zeros((self.height, self.width), dtype=np.uint8)
+        rx, ry = robot_grid_pose[0], robot_grid_pose[1]
+        for gx, gy in grid:
+            cv2.line(free_mask, (rx, ry), (int(gx), int(gy)), 1, 1)
+        free_mask[grid[:, 1], grid[:, 0]] = 0
+
+        self.map_grid -= free_mask.astype(np.float32) * 0.1
         self.map_grid[grid[:, 1], grid[:, 0]] += 0.2
         self.map_grid = np.clip(self.map_grid, -3, 6,)
 
@@ -310,7 +322,7 @@ class MapNode(Node):
         qz = math.sin(yaw / 2)
         qw = math.cos(yaw / 2)
 
-        # self.map_odom_tf_msg.header.stamp = self.get_clock().now().to_msg()
+        self.map_odom_tf_msg.header.stamp = self.get_clock().now().to_msg()
         self.map_odom_tf_msg.transform.translation.x = float(x)
         self.map_odom_tf_msg.transform.translation.y = float(y)
         self.map_odom_tf_msg.transform.translation.z = 0.0
