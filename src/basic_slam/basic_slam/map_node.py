@@ -246,13 +246,20 @@ class MapNode(Node):
         grid[:, 1] = np.clip(grid[:, 1], 0, self.height - 1)
         grid[:, 0] = np.clip(grid[:, 0], 0, self.width - 1)
         
-        for x, y in grid:
-            path = bresenham_line(robot_grid_pose[0], robot_grid_pose[1], x, y)
-            if len(path) > 0:
-                self.map_grid[path[:, 1], path[:, 0]] -= 0.05
-        
+        free_count = np.zeros((self.height, self.width), dtype=np.int32)
+        rx, ry = robot_grid_pose[0], robot_grid_pose[1]
+        for gx, gy in grid:
+            pts = bresenham_line(rx, ry, int(gx), int(gy))
+            if len(pts) == 0:
+                continue
+            xs, ys = pts[:, 0], pts[:, 1]
+            m = (xs >= 0) & (xs < self.width) & (ys >= 0) & (ys < self.height)
+            np.add.at(free_count, (ys[m], xs[m]), 1)
+
+        self.map_grid -= free_count.astype(np.float32) * 0.1
         self.map_grid[grid[:, 1], grid[:, 0]] += 0.2
-        self.map_grid = np.clip(self.map_grid, -3, 6,)
+        self.map_grid = np.clip(self.map_grid, -6, 6)
+
 
         probability = 1 - 1 / (1 + np.exp(self.map_grid))
         msg_grid = np.full((self.height, self.width), -1, dtype=np.int8)
