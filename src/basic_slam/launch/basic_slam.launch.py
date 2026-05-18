@@ -61,8 +61,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         base_footprint_tf,
-        # imu_link_tf,
-        # base_scan_tf,
+        imu_link_tf,
+        base_scan_tf,
         imu_odom_node,
         map_node,
         rviz_node,

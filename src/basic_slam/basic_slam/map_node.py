@@ -256,15 +256,19 @@ class MapNode(Node):
         grid[:, 1] = np.clip(grid[:, 1], 0, self.height - 1)
         grid[:, 0] = np.clip(grid[:, 0], 0, self.width - 1)
         
-        free_mask = np.zeros((self.height, self.width), dtype=np.uint8)
+        free_count = np.zeros((self.height, self.width), dtype=np.int32)
         rx, ry = robot_grid_pose[0], robot_grid_pose[1]
         for gx, gy in grid:
-            cv2.line(free_mask, (rx, ry), (int(gx), int(gy)), 1, 1)
-        free_mask[grid[:, 1], grid[:, 0]] = 0
+            pts = bresenham_line(rx, ry, int(gx), int(gy))
+            if len(pts) == 0:
+                continue
+            xs, ys = pts[:, 0], pts[:, 1]
+            m = (xs >= 0) & (xs < self.width) & (ys >= 0) & (ys < self.height)
+            np.add.at(free_count, (ys[m], xs[m]), 1)
 
-        self.map_grid -= free_mask.astype(np.float32) * 0.1
+        self.map_grid -= free_count.astype(np.float32) * 0.1
         self.map_grid[grid[:, 1], grid[:, 0]] += 0.2
-        self.map_grid = np.clip(self.map_grid, -3, 6,)
+        self.map_grid = np.clip(self.map_grid, -6, 6)
 
         probability = 1 - 1 / (1 + np.exp(self.map_grid))
         msg_grid = np.full((self.height, self.width), -1, dtype=np.int8)
@@ -286,6 +290,9 @@ class MapNode(Node):
         d_x1 = self.odom_x - self.last_odom_x
         d_y1 = self.odom_y - self.last_odom_y
         d_yaw = get_normalized_angle(self.odom_yaw - self.last_odom_yaw)
+
+        # if abs(d_x1) < 1e-6 and abs(d_y1) < 1e-6 and abs(d_yaw) < 1e-6:
+        #     return self.x_icp, self.y_icp, self.yaw_icp
 
         c, s = math.cos(self.last_odom_yaw), math.sin(self.last_odom_yaw)
         d_x = c * d_x1 + s * d_y1
