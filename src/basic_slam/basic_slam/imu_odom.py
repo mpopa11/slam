@@ -13,21 +13,27 @@ class ImuNode(Node):
     
     def __init__(self):
         super().__init__("imu_node")
-        self.imu_subscription = self.create_subscription(
-            Imu,
-            "/imu",
-            self.callback_imu,
-            10
-        )
-        self.imu_subscription
-        self.odom_subscription = self.create_subscription(
+        # self.imu_subscription = self.create_subscription(
+        #     Imu,
+        #     "/imu",
+        #     self.callback_imu,
+        #     10
+        # )
+        # self.imu_subscription
+        # self.odom_subscription = self.create_subscription(
+        #     Odometry,
+        #     "/odom",
+        #     self.callback_odom,
+        #     10
+        # )
+        # self.odom_subscription
+        self.ekf_subscription = self.create_subscription(
             Odometry,
-            "/odom",
-            self.callback_odom,
+            "/odometry/filtered",
+            self.ekf_callback,
             10
         )
-        self.odom_subscription
-
+        self.ekf_subscription
         self.publisher = self.create_publisher(
             PosYaw,
             "robot_data",
@@ -41,6 +47,17 @@ class ImuNode(Node):
         self.pos_x = 0
         self.pos_y = 0
 
+    def ekf_callback(self, msg):
+        q = msg.pose.pose.orientation
+        yaw = math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        )
+        pos_yaw = PosYaw()
+        pos_yaw.x = msg.pose.pose.position.x
+        pos_yaw.y = msg.pose.pose.position.y
+        pos_yaw.yaw = yaw
+        self.publisher.publish(pos_yaw)
 
     def callback_imu(self, msg):
         rot_z = math.atan2(2 * (msg.orientation.w * msg.orientation.z +  msg.orientation.x * msg.orientation.y),
