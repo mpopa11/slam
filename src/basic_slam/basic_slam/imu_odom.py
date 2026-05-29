@@ -54,6 +54,8 @@ class ImuNode(Node):
             1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         )
         pos_yaw = PosYaw()
+        pos_yaw.header.stamp = msg.header.stamp
+        pos_yaw.header.frame_id = 'odom'
         pos_yaw.x = msg.pose.pose.position.x
         pos_yaw.y = msg.pose.pose.position.y
         pos_yaw.yaw = yaw
