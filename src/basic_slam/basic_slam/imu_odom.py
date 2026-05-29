@@ -62,10 +62,12 @@ class ImuNode(Node):
             # self.get_logger().info('\nyaw = %f\n or %f\n pos_x = %f\n pos_y = %f\n' % (rot_z, self.yaw, pos_x, pos_y))
 
             pos_yaw = PosYaw()
+            pos_yaw.header.stamp = msg.header.stamp
+            pos_yaw.header.frame_id = 'odom'
             pos_yaw.x = pos_x
             pos_yaw.y = pos_y
             pos_yaw.yaw = rot_z
-            
+
             self.publisher.publish(pos_yaw)
 
     def callback_odom(self, msg):

@@ -108,7 +108,7 @@ class MapNode(Node):
         self.y_icp = 0.0
         self.yaw_icp = None
         
-        self.map_length = 20
+        self.map_length = 30
         self.map_origin_x = self.map_length * -1 / 2
         self.map_origin_y = self.map_length * -1 / 2
         self.resolution = 0.05
