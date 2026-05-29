@@ -155,7 +155,7 @@ class MapNode(Node):
         self.yaw_icp_prev = None
 
     def pose_callback(self, msg):
-        now = self.get_clock().now().nanoseconds * 1e-9
+        now = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         self.pose_buffer.append((now, msg.x, msg.y, msg.yaw))
         # Drop entries older than max_age relative to the newest sample.
         while self.pose_buffer and (now - self.pose_buffer[0][0]) > self.pose_buffer_max_age:
