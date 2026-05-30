@@ -285,6 +285,24 @@ class MapNode(Node):
         #     self.pose_msg_recv = False
         #     return
 
+        # Reject implausible odom jumps (e.g. a transient EKF divergence) so a
+        # single bad sample can't poison the map or blow up GICP. We skip the
+        # map update for this scan but re-baseline last_odom to the new value:
+        # x_icp (the actual map pose) is left untouched, and the next scan's
+        # delta is measured from here, so SLAM auto-resumes the instant the EKF
+        # settles -- whether the jump was a one-off spike or a step offset.
+        jump_dist = math.hypot(self.odom_x - self.last_odom_x,
+                               self.odom_y - self.last_odom_y)
+        jump_yaw = abs(get_normalized_angle(self.odom_yaw - self.last_odom_yaw))
+        if jump_dist > 1.0 or jump_yaw > 0.5:
+            self.get_logger().warn(
+                f'rejecting odom jump: d={jump_dist:.2f}m dyaw={jump_yaw:.2f}rad')
+            self.last_odom_x = self.odom_x
+            self.last_odom_y = self.odom_y
+            self.last_odom_yaw = self.odom_yaw
+            self.pose_msg_recv = False
+            return
+
         pred_x, pred_y, pred_yaw = self.predict_pose()
         
         if len(local_coordinates) == 0:

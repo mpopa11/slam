@@ -59,6 +59,13 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}]
     )
 
+    odom_cov_node = Node(
+        package='basic_slam',
+        executable='odom_cov',
+        name='odom_cov',
+        parameters=[{'use_sim_time': True}]
+    )
+
     return LaunchDescription([
         base_footprint_tf,
         imu_link_tf,
@@ -67,4 +74,5 @@ def generate_launch_description():
         map_node,
         rviz_node,
         ekf_node,
+        odom_cov_node,
     ])
