@@ -6,7 +6,7 @@ from tf2_ros import TransformBroadcaster
 
 from messages.msg import PosYaw
 from sensor_msgs.msg import LaserScan
-from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import OccupancyGrid, Odometry
 from geometry_msgs.msg import TransformStamped
 
 import numpy as np
@@ -93,6 +93,8 @@ class MapNode(Node):
             "/map",
             qos
         )
+
+        self.slam_pose_publisher = self.create_publisher(Odometry, "/slam_pose", 10)
 
         self.odom_x = 0.0
         self.odom_y = 0.0
@@ -285,24 +287,6 @@ class MapNode(Node):
         #     self.pose_msg_recv = False
         #     return
 
-        # Reject implausible odom jumps (e.g. a transient EKF divergence) so a
-        # single bad sample can't poison the map or blow up GICP. We skip the
-        # map update for this scan but re-baseline last_odom to the new value:
-        # x_icp (the actual map pose) is left untouched, and the next scan's
-        # delta is measured from here, so SLAM auto-resumes the instant the EKF
-        # settles -- whether the jump was a one-off spike or a step offset.
-        jump_dist = math.hypot(self.odom_x - self.last_odom_x,
-                               self.odom_y - self.last_odom_y)
-        jump_yaw = abs(get_normalized_angle(self.odom_yaw - self.last_odom_yaw))
-        if jump_dist > 1.0 or jump_yaw > 0.5:
-            self.get_logger().warn(
-                f'rejecting odom jump: d={jump_dist:.2f}m dyaw={jump_yaw:.2f}rad')
-            self.last_odom_x = self.odom_x
-            self.last_odom_y = self.odom_y
-            self.last_odom_yaw = self.odom_yaw
-            self.pose_msg_recv = False
-            return
-
         pred_x, pred_y, pred_yaw = self.predict_pose()
         
         if len(local_coordinates) == 0:
@@ -456,8 +440,8 @@ class MapNode(Node):
 
         self.map_publisher.publish(self.occupancy_grid_msg)
         self.publish_map_odom_tf()
+        self.publish_slam_pose(msg.header.stamp)
 
-        # Stash scan-end ICP pose for the next scan's second-pass deskew.
         self.t_end_prev = t_end
         self.x_icp_prev = self.x_icp
         self.y_icp_prev = self.y_icp
@@ -495,6 +479,20 @@ class MapNode(Node):
 
         return np.column_stack([x, y, np.zeros(len(x))])
     
+    def publish_slam_pose(self, stamp):
+        if self.yaw_icp is None:
+            return
+
+        odom = Odometry()
+        odom.header.stamp = stamp
+        odom.header.frame_id = "map"
+        odom.child_frame_id = "base_link"
+        odom.pose.pose.position.x = float(self.x_icp)
+        odom.pose.pose.position.y = float(self.y_icp)
+        odom.pose.pose.orientation.z = float(math.sin(self.yaw_icp / 2))
+        odom.pose.pose.orientation.w = float(math.cos(self.yaw_icp / 2))
+        self.slam_pose_publisher.publish(odom)
+
     def publish_map_odom_tf(self):
 
         if self.yaw_icp is None:

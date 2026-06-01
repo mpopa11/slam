@@ -33,6 +33,8 @@ setup(
             'imu_odom = basic_slam.imu_odom:main',
             'map_node = basic_slam.map_node:main',
             'odom_cov = basic_slam.odom_cov:main',
+            'metrics = basic_slam.metrics:main',
+            'ground_truth = basic_slam.ground_truth:main'
         ],
     },
 )
