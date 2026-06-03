@@ -25,17 +25,17 @@
                     false, false, true,
                     false, false, false]
     # Reject gyro measurements whose innovation is too many sigma out.
-    # imu0_twist_rejection_threshold: 15.0
+    imu0_twist_rejection_threshold: 15.0
     # imu0_remove_gravitational_acceleration: true
-    # imu0_differential: false
+    # imu0_differential: true
     # imu0_relative: true
     publish_tf: true
 
-    # Scale process noise with velocity: near-zero drift when slow/stopped.
-    dynamic_process_noise_covariance: true
-    # Revert and re-apply late / out-of-order measurements instead of diverging.
-    smooth_lagged_data: true
-    history_length: 1.0
+    # # Scale process noise with velocity: near-zero drift when slow/stopped.
+    # dynamic_process_noise_covariance: true
+    # # Revert and re-apply late / out-of-order measurements instead of diverging.
+    # smooth_lagged_data: true
+    # history_length: 1.0
     # Process noise covariance (Q) — lower = trust the model more, higher = trust measurements more
     # Order: x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
     process_noise_covariance: [0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,    0.0,    0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,

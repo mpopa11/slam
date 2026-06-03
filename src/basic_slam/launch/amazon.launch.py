@@ -117,5 +117,5 @@ def generate_launch_description():
         odom_cov_node,
         gt_bridge,
         ground_truth_node,
-        metrics_node,
+        # metrics_node,
     ])

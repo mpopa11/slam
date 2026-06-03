@@ -103,5 +103,5 @@ def generate_launch_description():
         gazebo,
         gt_bridge,
         ground_truth_node,
-        metrics_node,
+        # metrics_node,
     ])
