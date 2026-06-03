@@ -81,7 +81,7 @@ def generate_launch_description():
         model_env,
         imu_odom_node,
         map_node,
-        metrics_node,
+        # metrics_node,
         rviz_node,
         gazebo,
         gt_bridge,

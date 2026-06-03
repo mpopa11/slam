@@ -94,5 +94,5 @@ def generate_launch_description():
         rviz_node,
         gt_bridge,
         ground_truth_node,
-        metrics_node,
+        # metrics_node,
     ])
